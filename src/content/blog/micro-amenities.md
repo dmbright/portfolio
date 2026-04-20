@@ -29,4 +29,10 @@ Here's a map of public micro amenities to help you find what you need:
 * Trash cans
 * (+ bike racks, so you can lock up while handling the above)
 
-<iframe width="100%" height=80vh frameborder="0" title="Felt Map" src="https://felt.com/embed/map/SF-Micro-Amenities-aYaf2aSaTzS4c3ihh9Ab9AtA?loc=37.77554%2C-122.4665%2C14.65z&legend=1&cooperativeGestures=1&link=1&geolocation=0&zoomControls=1&scaleBar=1" referrerpolicy="strict-origin-when-cross-origin"></iframe>
+<iframe 
+  src="https://felt.com/embed/map/SF-Micro-Amenities-aYaf2aSaTzS4c3ihh9Ab9AtA?loc=37.77554%2C-122.4665%2C14.65z&legend=1&cooperativeGestures=1&link=1&geolocation=0&zoomControls=1&scaleBar=1"
+  title="Felt Map"
+  style="width: 100%; height: 80vh; border: none; border-radius: 8px;"
+  referrerpolicy="strict-origin-when-cross-origin"
+  allowfullscreen>
+</iframe>
