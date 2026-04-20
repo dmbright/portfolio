@@ -30,7 +30,7 @@ Here's a map of public micro amenities to help you find what you need:
 * (+ bike racks, so you can lock up while handling the above)
 
 <iframe 
-  src="https://felt.com/embed/map/SF-Micro-Amenities-aYaf2aSaTzS4c3ihh9Ab9AtA?loc=37.77554%2C-122.4665%2C14.65z&legend=1&cooperativeGestures=1&link=1&geolocation=0&zoomControls=1&scaleBar=1"
+  src="https://felt.com/embed/map/SF-Micro-Amenities-aYaf2aSaTzS4c3ihh9Ab9AtA?loc=37.76717,-122.45046,12.94z&legend=1&cooperativeGestures=1&link=1&geolocation=0&zoomControls=1&scaleBar=1"
   title="Felt Map"
   style="width: 100%; height: 80vh; border: none; border-radius: 8px;"
   referrerpolicy="strict-origin-when-cross-origin"
