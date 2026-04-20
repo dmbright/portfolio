@@ -1,9 +1,16 @@
 ---
-title: 'Public Micro Amenities in SF'
-description: 'Lorem ipsum dolor sit amet'
+title: 'Public Micro-Amenities in SF'
+description: 'Mapping San Francisco water fountains and waste bins.'
 pubDate: 'April 20 2026'
-heroImage: 
+heroImage: '/blog-placeholder-about.jpg' 
 ---
+
+<style>
+  /* This hides the hero image entirely */
+  .hero-image {
+    display: none;
+  }
+</style>
 
 Walking or biking around SF and have a need?
 * Thirsty?
