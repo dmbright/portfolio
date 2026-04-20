@@ -2,7 +2,7 @@
 title: 'Public Micro Amenities in SF'
 description: 'Lorem ipsum dolor sit amet'
 pubDate: 'April 20 2026'
-# heroImage: '../../assets/blog-placeholder-3.jpg'
+heroImage: 
 ---
 
 Walking or biking around SF and have a need?
