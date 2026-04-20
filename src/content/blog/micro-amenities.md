@@ -2,7 +2,7 @@
 title: 'Public Micro-Amenities in SF'
 description: 'Mapping San Francisco water fountains and waste bins.'
 pubDate: 'April 20 2026'
-heroImage: '/blog-placeholder-about.jpg' 
+heroImage: '/src/assets/blog-placeholder-1.jpg' 
 ---
 
 <style>
