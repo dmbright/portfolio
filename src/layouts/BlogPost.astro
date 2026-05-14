@@ -35,7 +35,18 @@ const { title, description, pubDate, updatedDate, heroImage } = Astro.props;
 				margin: auto;
 				padding: 1em;
 				color: rgb(var(--gray-dark));
+				margin-bottom: 0;
+				margin-top: 0;
+				padding-top: 0;
+				padding-bottom: 0;
+				/* Reduces the gap between paragraphs */
+				line-height: 1.6;
+				/* Keeps text readable */
 			}
+			/* This targets the very last paragraph so it doesn't add extra space at the bottom */
+			.prose p:last-child {
+				margin-bottom: 0;
+				}
 			.title {
 				margin-bottom: 1em;
 				padding: 1em 0;

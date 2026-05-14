@@ -1,0 +1,127 @@
+---
+import Layout from '../layouts/Project.astro'; // Use your existing layout
+import amenityData from '../data/amenities.json';
+---
+
+<Layout
+title="Amenity Finder"
+description="Find the closest resource in SF"
+pubDate={new Date()}
+>
+	<div class="finder-container">
+		<h1>I need to...</h1>
+		
+		<div class="button-grid">
+			<button class="action-btn" data-type="bathroom">Pee 🚽</button>
+			<button class="action-btn" data-type="water">Drink Water 💧</button>
+			<button class="action-btn" data-type="trash">Toss Something 🗑️</button>
+			<button class="action-btn" data-type="bench">Sit Down 🪑</button>
+		</div>
+
+		<div id="status-message"></div>
+		<div id="result-card" class="hidden">
+			<p>The closest is <strong id="nearest-name">...</strong></p>
+			<a id="directions-link" href="#" target="_blank" class="directions-btn">Take me there</a>
+		</div>
+	</div>
+
+	<style>
+		.finder-container { text-align: center; padding: 2rem 0; }
+		.button-grid { 
+    display: flex;
+    flex-direction: column; /* This stacks them vertically */
+    gap: 12px; 
+    margin-top: 2rem;
+    width: 100%;
+    max-width: 400px; /* Keeps the buttons from getting too wide on desktop */
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.action-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 18px;
+    font-size: 1.3rem;
+    border-radius: 12px;
+    border: 2px solid rgb(var(--gray-light));
+    background: white;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.action-btn:hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+}
+		.action-btn:active { transform: scale(0.95); background: #eee; }
+		.hidden { display: none; }
+		.directions-btn {
+			display: inline-block;
+			margin-top: 1rem;
+			padding: 10px 20px;
+			background: black;
+			color: white;
+			text-decoration: none;
+			border-radius: 8px;
+		}
+	</style>
+
+	<script>
+  import amenityData from '../data/amenities.json';
+
+  // This ensures the code only runs AFTER the page is fully loaded
+  document.addEventListener('astro:page-load', () => {
+    initFinder();
+  }, { once: false });
+
+  // Fallback for standard loading
+  document.addEventListener('DOMContentLoaded', () => {
+    initFinder();
+  });
+
+  function initFinder() {
+    console.log("Finder logic initialized");
+    const buttons = document.querySelectorAll('.action-btn');
+    
+    buttons.forEach(button => {
+      button.addEventListener('click', () => {
+        const type = button.getAttribute('data-type');
+        console.log("Button clicked:", type);
+        findNearest(type);
+      });
+    });
+  }
+
+  function findNearest(category) {
+    navigator.geolocation.getCurrentPosition((position) => {
+      const { latitude, longitude } = position.coords;
+      
+      const matches = amenityData.features.filter(f => f.properties.type === category);
+      
+      let nearest = null;
+      let minDistance = Infinity;
+
+      for (const point of matches) {
+        const [lon, lat] = point.geometry.coordinates;
+        // Simple distance math
+        const dist = Math.sqrt(Math.pow(lat - latitude, 2) + Math.pow(lon - longitude, 2));
+        if (dist < minDistance) {
+          minDistance = dist;
+          nearest = point;
+        }
+      }
+
+      if (nearest) {
+        document.getElementById('nearest-name').innerText = nearest.properties.name || "Unnamed location";
+        const link = document.getElementById('directions-link');
+        link.href = `https://www.google.com/maps/dir/?api=1&destination=${nearest.geometry.coordinates[1]},${nearest.geometry.coordinates[0]}`;
+        document.getElementById('result-card').classList.remove('hidden');
+        document.getElementById('status-message').innerText = "";
+      }
+    });
+  }
+</script>
+</Layout>

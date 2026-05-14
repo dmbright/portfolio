@@ -1,0 +1,63 @@
+---
+// src/layouts/ProjectLayout.astro
+const { title } = Astro.props;
+const currentPath = Astro.url.pathname;
+const isHome = currentPath === "/" || currentPath === "";
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>{title}</title>
+	</head>
+	<body>
+		<main class="container">
+			{!isHome && (
+	<nav class="top-nav">
+		<a href="/" class="back-btn" aria-label="Back to home page">←</a>
+	</nav>
+)}
+			
+			<slot />
+		</main>
+	</body>
+</html>
+
+<style is:global>
+	/* SHARED DESIGN SYSTEM */
+	:root { --font-stack: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+	body { font-family: var(--font-stack); color: #222; background: #fafafa; margin: 0; padding: 0; line-height: 1.5; }
+	.container { max-width: 680px; margin: 0 auto; padding: 2rem 1rem; position: relative; }
+	hr { border: 0; border-top: 1px solid #e5e5e5; margin: 3rem 0; }
+
+	/* SUPER SIMPLE BACK BUTTON POSITIONING */
+	.top-nav {
+		margin-bottom: 1.5rem;
+	}
+	.back-btn {
+		color: #666;
+		text-decoration: none;
+		font-size: 0.95rem;
+		font-weight: 500;
+		display: inline-block;
+	}
+	.back-btn:hover {
+		color: #000;
+		text-decoration: underline;
+	}
+
+	/* GLOBAL TYPOGRAPHY */
+	.hero { padding: 0.5rem 0; }
+	h1 { font-size: 2.2rem; margin-bottom: 0.5rem; letter-spacing: -0.5px; margin-top: 0; }
+	.bio, .subtitle { font-size: 1.15rem; color: #454545; margin: 0; }
+
+	/* GLOBAL SOCIAL FOOTER */
+	.social-footer { text-align: center; padding: 2rem 0; color: #666; display: block; clear: both; }
+	.social-footer p { font-size: 0.95rem; margin-bottom: 0.75rem; }
+	.social-links { display: flex; justify-content: center; align-items: center; gap: 20px; }
+	.social-links a { color: #444; transition: color 0.15s ease; display: inline-block; width: 24px; height: 24px; }
+	.social-links a:hover { color: #000; }
+	.social-links svg.icon { width: 24px; height: 24px; max-width: 24px; max-height: 24px; fill: currentColor; display: block; }
+</style>

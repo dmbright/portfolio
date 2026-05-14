@@ -1,0 +1,60 @@
+---
+// Clean frontmatter - no blog components needed
+const { title, description } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="description" content={description} />
+		<meta name="viewport" content="width=device-width" />
+		<title>{title}</title>
+		</head>
+	<body>
+		<main>
+			<slot /> </main>
+	</body>
+</html>
+
+<style>
+	
+	/* Optional: Add basic padding to keep your page looking clean */
+	main {
+		max-width: 720px;
+		margin: auto;
+		padding: 1em;
+	}
+
+	/* SOCIAL FOOTER STYLES (Home page only) */
+	.social-footer {
+		text-align: center;
+		padding: 2rem 0;
+		color: #666;
+	}
+
+	.social-footer p {
+		font-size: 0.95rem;
+		margin-bottom: 0.75rem;
+	}
+
+	.social-links {
+		display: flex;
+		justify-content: center;
+		gap: 20px;
+	}
+
+	.social-links a {
+		color: #444;
+		transition: color 0.15s ease;
+	}
+
+	.social-links a:hover {
+		color: #000;
+	}
+
+	.icon {
+		width: 24px;
+		height: 24px;
+	}
+</style>
