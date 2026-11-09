@@ -1,0 +1,381 @@
+---
+import Layout from '../layouts/Project.astro';
+---
+
+<Layout
+  title="KEXP → Spotify Auto-Sync"
+  description="Automatically sync hearted songs from the KEXP Android & Android Auto app to your Spotify Liked Songs."
+  pubDate={new Date()}
+>
+  <div class="project-page">
+    <header class="hero">
+      <div class="pill-row">
+        <span class="pill kexp">KEXP 90.3 FM</span>
+        <span class="pill spotify">Spotify Web API</span>
+        <span class="pill android">Android &amp; Android Auto</span>
+      </div>
+      <h1>📻 KEXP → Spotify Auto-Sync</h1>
+      <p class="subtitle">
+        Every time I tap the heart on a song in the KEXP app—whether on my phone screen, in the playlist history, or on my car's Android Auto display—it automatically likes that song on Spotify.
+      </p>
+    </header>
+
+    <div class="cta-box">
+      <div class="cta-buttons">
+        <a href="https://github.com/dmbright/kexp-spotify-sync/releases/latest" target="_blank" rel="noopener noreferrer" class="btn primary">
+          Download Android APK ↗
+        </a>
+        <a href="https://github.com/dmbright/kexp-spotify-sync" target="_blank" rel="noopener noreferrer" class="btn secondary">
+          View Source on GitHub ↗
+        </a>
+      </div>
+      <p class="cta-note">
+        Free &amp; open-source (MIT License) • Android 8.0+ • Zero background polling (&lt;0.2% battery/day)
+      </p>
+    </div>
+
+    <hr />
+
+    <section class="section">
+      <h2>Why I Built This</h2>
+      <p>
+        Seattle's <a href="https://www.kexp.org/" target="_blank" rel="noopener noreferrer">KEXP</a> is one of the best human-curated radio stations in the world. Their mobile app makes it easy to tap the <strong>Heart</strong> icon when you hear a great track—both in the app and right on your car dashboard via <strong>Android Auto</strong>.
+      </p>
+      <p>
+        However, the KEXP app stores favorites <strong>locally on your device</strong> without a cloud account or streaming integration. I wanted a seamless bridge: the moment I heart a song on KEXP (or un-heart an accidental tap), it should immediately sync to my <strong>Spotify Liked Songs</strong>—even if I'm tapping a song from KEXP's broadcast history from hours ago.
+      </p>
+    </section>
+
+    <section class="section">
+      <h2>What It Does</h2>
+      <div class="feature-grid">
+        <div class="feature-card">
+          <h3>🚗 Hands-Free Android Auto Sync</h3>
+          <p>Listens to KEXP's active <code>MediaSession</code> state transitions (<code>Not Favorite</code> ↔ <code>Favorite</code>) so hearting a song on your car screen likes it on Spotify within two seconds.</p>
+        </div>
+        <div class="feature-card">
+          <h3>🕒 Works on Broadcast History</h3>
+          <p>Scroll back hours or days in KEXP's "Recently Played" playlist on your phone—tapping the heart on any historical row extracts that specific song and artist rather than what's playing live.</p>
+        </div>
+        <div class="feature-card">
+          <h3>💔 Smart Toggle &amp; Pre-Liked Awareness</h3>
+          <p>Accidentally liked a song? Tap the heart again to un-heart it and it's automatically removed from your Spotify library—while intelligently ignoring songs you had already favorited before installing the tool.</p>
+        </div>
+        <div class="feature-card">
+          <h3>🛡️ Self-Healing Update Watchdog</h3>
+          <p>If a future KEXP app update renames its internal button IDs, a built-in Watchdog alerts you and lets you tap <strong>"Re-Learn Heart Button"</strong> to lock onto the new button without rebuilding code.</p>
+        </div>
+      </div>
+    </section>
+
+    <hr />
+
+    <section class="section">
+      <h2>How Anyone Can Install &amp; Use It (No Coding Required)</h2>
+      <p>
+        Because Spotify's API restricts unverified apps to a 25-user allowlist unless each user supplies their own free Spotify Developer Client ID, there are two ways to set up the app on your Android phone:
+      </p>
+
+      <div class="setup-steps">
+        <div class="step">
+          <span class="step-num">1</span>
+          <div>
+            <h4>Install the APK &amp; Allow Restricted Settings</h4>
+            <p>
+              Download the latest <code>.apk</code> from GitHub Releases on your Android phone. On Android 13+, open <strong>Settings → Apps → KEXP → Spotify Sync → ⋮ (top right) → Allow restricted settings</strong>, then tap the two <strong>Enable</strong> buttons inside the app to turn on the MediaSession and KEXP UI listeners.
+            </p>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="step-num">2</span>
+          <div>
+            <h4>Connect Your Spotify Account (OAuth PKCE)</h4>
+            <p>
+              <strong>Option A (Friends &amp; Fellow KEXP Listeners):</strong> Reach out to me to have your Spotify email added to my app's allowlist, or<br />
+              <strong>Option B (60-Second Self-Service):</strong> Tap <strong>"Copy Redirect URI"</strong> and <strong>"Open Spotify Dashboard ↗"</strong> right inside the app, click <em>Create App</em> at <code>developer.spotify.com/dashboard</code>, paste <code>kexpspotifysync://callback</code> as the Redirect URI, and paste your Client ID into the app.
+            </p>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="step-num">3</span>
+          <div>
+            <h4>Backfill Your Old KEXP Favorites (Optional)</h4>
+            <p>
+              Want to import songs you hearted months ago? In the KEXP app, go to <strong>Settings → Share / Export Favorites</strong> and choose <strong>"Sync KEXP Favorites to Spotify"</strong> from the Android Share Sheet.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <hr />
+
+    <section class="section transparency-box">
+      <h2>🤖 Built with Google Antigravity (Transparency Note)</h2>
+      <p>
+        I built this tool by pair-programming with <strong>Google Antigravity</strong>, an agentic AI coding environment. Here is how the human + AI division of labor worked in practice:
+      </p>
+      <div class="two-col">
+        <div>
+          <h4>What I (Doug) Did</h4>
+          <ul>
+            <li>Defined the product problem, UX goals, and strict battery constraints (zero background polling).</li>
+            <li>Asked for a proactive Watchdog so KEXP app updates wouldn't fail silently.</li>
+            <li>Created the Spotify Developer app, configured the PKCE Redirect URI, and provided the Client ID.</li>
+            <li>Paired my Pixel 10 Pro to my Mac over Wireless ADB (<code>adb pair</code>) so live device state could be inspected.</li>
+            <li>QA-tested live streams, historical playlist rows, and edge cases (catching the <code>"Recently Played"</code> header offset and pre-liked un-heart behavior).</li>
+          </ul>
+        </div>
+        <div>
+          <h4>What Antigravity Did</h4>
+          <ul>
+            <li>Evaluated technical architectures and scaffolded the Kotlin / Jetpack Compose Android app from scratch.</li>
+            <li>Installed OpenJDK 17, Android SDK 34, and Gradle on my Mac and compiled/streamed APKs over Wireless ADB.</li>
+            <li>Inspected <code>org.kexp.android</code>'s live <code>dumpsys media_session</code> and Flutter <code>uiautomator</code> hierarchy on-device.</li>
+            <li>Diagnosed Spotify's 2026 deprecation of <code>PUT /v1/me/tracks</code> and migrated to <code>/v1/me/library</code>.</li>
+            <li>Implemented the offline <code>WorkManager</code> retry queue for car tunnels and the Share Sheet CSV importer.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="changelog-drawer">
+      <details>
+        <summary>View Technical Architecture &amp; Notes for KEXP Developers</summary>
+        <div class="changelog-content">
+          <h4>How Detection Works Under the Hood</h4>
+          <ul>
+            <li>
+              <strong>Android Auto &amp; Lockscreen (<code>MediaSessionManager</code>):</strong> KEXP's Android app uses <code>com.ryanheise.audioservice</code> and exposes a single <code>PlaybackState.CustomAction</code> that flips between <code>mName="Not Favorite" (icon=2131230894)</code> and <code>mName="Favorite" (icon=2131230893)</code>. Observing this directional state transition lets us distinguish likes from un-likes with zero ambiguity.
+            </li>
+            <li>
+              <strong>In-App Playlist History (Scoped <code>AccessibilityService</code>):</strong> Configured with <code>android:packageNames="org.kexp.android"</code> and <code>typeViewClicked</code> so the Android OS never wakes the service outside KEXP. Each Flutter playlist card exposes a multiline <code>contentDescription</code> (<code>"Track\nArtist\n6:55 AM"</code>), while the very first card prepends the section header (<code>"Recently Played\nTrack\nArtist\n6:55 AM"</code>).
+            </li>
+            <li>
+              <strong>KEXP v2 Broadcast API Fallback:</strong> If live stream metadata ever displays a show name or DJ airbreak instead of the track, the syncer queries <code>https://api.kexp.org/v2/plays/?format=json&amp;limit=5</code> to resolve the exact trackplay.
+            </li>
+          </ul>
+          <h4>Constructive Notes for the KEXP Mobile Team</h4>
+          <ul>
+            <li>
+              <strong>First Playlist Card Accessibility Label:</strong> In the Flutter playlist view, the <code>"Recently Played"</code> heading is merged into the first song card's semantics node rather than marked as an independent <code>Semantics(header: true)</code> node, which shifts screen-reader announcements on the top row.
+            </li>
+            <li>
+              <strong>Native Streaming Export:</strong> Everything in this repository is MIT-licensed—if KEXP ever wants to fold PKCE Spotify syncing or <code>/v1/me/library</code> batch export natively into <code>org.kexp.android</code>, feel free to use any part of it!
+            </li>
+          </ul>
+        </div>
+      </details>
+    </section>
+  </div>
+
+  <style>
+    .project-page {
+      padding: 1rem 0 3rem;
+    }
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 0.75rem;
+    }
+    .pill {
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #eee;
+      color: #333;
+    }
+    .pill.kexp { background: #fff3e0; color: #e65100; }
+    .pill.spotify { background: #e8f5e9; color: #1b5e20; }
+    .pill.android { background: #e3f2fd; color: #0d47a1; }
+
+    .subtitle {
+      font-size: 1.15rem;
+      line-height: 1.6;
+      color: #444;
+      margin-top: 0.5rem;
+    }
+
+    .cta-box {
+      margin-top: 1.75rem;
+      padding: 1.25rem;
+      background: #fff;
+      border: 1px solid #e5e5e5;
+      border-radius: 12px;
+    }
+    .cta-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .btn {
+      display: inline-block;
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      text-decoration: none;
+      transition: transform 0.15s ease, opacity 0.15s ease;
+    }
+    .btn:hover {
+      transform: translateY(-1px);
+    }
+    .btn.primary {
+      background: #1db954;
+      color: #000;
+    }
+    .btn.secondary {
+      background: #111;
+      color: #fff;
+    }
+    .cta-note {
+      font-size: 0.82rem;
+      color: #666;
+      margin: 0.75rem 0 0 0;
+    }
+
+    .section h2 {
+      font-size: 1.5rem;
+      margin-bottom: 0.75rem;
+    }
+    .section p {
+      color: #333;
+      line-height: 1.65;
+      margin-bottom: 1rem;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+      margin-top: 1rem;
+    }
+    .feature-card {
+      background: #fff;
+      border: 1px solid #e5e5e5;
+      border-radius: 10px;
+      padding: 1.15rem;
+    }
+    .feature-card h3 {
+      margin: 0 0 0.5rem 0;
+      font-size: 1.05rem;
+    }
+    .feature-card p {
+      margin: 0;
+      font-size: 0.92rem;
+      color: #555;
+      line-height: 1.5;
+    }
+
+    .setup-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      margin-top: 1.25rem;
+    }
+    .step {
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+      background: #fff;
+      border: 1px solid #e5e5e5;
+      border-radius: 10px;
+      padding: 1.1rem;
+    }
+    .step-num {
+      flex-shrink: 0;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: #111;
+      color: #fff;
+      font-weight: 700;
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .step h4 {
+      margin: 0 0 0.35rem 0;
+      font-size: 1rem;
+    }
+    .step p {
+      margin: 0;
+      font-size: 0.92rem;
+      color: #444;
+      line-height: 1.5;
+    }
+
+    .transparency-box {
+      background: #f6f8fa;
+      border: 1px solid #e1e4e8;
+      border-radius: 12px;
+      padding: 1.5rem;
+    }
+    .transparency-box h2 {
+      margin-top: 0;
+    }
+    .two-col {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 18px;
+      margin-top: 1rem;
+    }
+    .two-col h4 {
+      margin: 0 0 0.5rem 0;
+      font-size: 1rem;
+    }
+    .two-col ul {
+      margin: 0;
+      padding-left: 1.2rem;
+      font-size: 0.9rem;
+      color: #444;
+      line-height: 1.55;
+    }
+    .two-col li {
+      margin-bottom: 0.4rem;
+    }
+
+    .changelog-drawer {
+      margin-top: 2.5rem;
+      border-top: 1px solid #e5e5e5;
+      padding-top: 1.5rem;
+      font-size: 0.92rem;
+      color: #555;
+    }
+    .changelog-drawer summary {
+      cursor: pointer;
+      font-weight: 600;
+      color: #222;
+      user-select: none;
+    }
+    .changelog-content {
+      margin-top: 1rem;
+      line-height: 1.55;
+      background: rgba(0, 0, 0, 0.02);
+      padding: 1.1rem;
+      border-radius: 8px;
+    }
+    .changelog-content h4 {
+      margin: 0.5rem 0;
+      color: #111;
+    }
+    .changelog-content ul {
+      padding-left: 1.25rem;
+      margin: 0.5rem 0 1rem 0;
+    }
+    .changelog-content li {
+      margin-bottom: 0.45rem;
+    }
+    code {
+      background: rgba(0,0,0,0.06);
+      padding: 2px 5px;
+      border-radius: 4px;
+      font-size: 0.85em;
+    }
+  </style>
+</Layout>
