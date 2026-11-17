@@ -1,127 +1,2228 @@
 ---
-import Layout from '../layouts/Project.astro'; // Use your existing layout
-import amenityData from '../data/amenities.json';
+import Layout from '../layouts/Project.astro';
 ---
 
 <Layout
-title="Amenity Finder"
-description="Find the closest resource in SF"
-pubDate={new Date()}
+  title="SF Public Amenity Finder"
+  description="Find the closest open bathroom, water fountain, trash can, or bench in San Francisco"
+  pubDate={new Date()}
 >
-	<div class="finder-container">
-		<h1>I need to...</h1>
-		
-		<div class="button-grid">
-			<button class="action-btn" data-type="bathroom">Pee 🚽</button>
-			<button class="action-btn" data-type="water">Drink Water 💧</button>
-			<button class="action-btn" data-type="trash">Toss Something 🗑️</button>
-			<button class="action-btn" data-type="bench">Sit Down 🪑</button>
-		</div>
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
 
-		<div id="status-message"></div>
-		<div id="result-card" class="hidden">
-			<p>The closest is <strong id="nearest-name">...</strong></p>
-			<a id="directions-link" href="#" target="_blank" class="directions-btn">Take me there</a>
-		</div>
-	</div>
+  <div class="wizard-shell">
+    <!-- Persistent Selected Need Card at the top of steps 2, 3, 4 (tap to change) -->
+    <div class="selected-need-Slot hidden" id="selectedNeedHeader">
+      <button type="button" class="need-card selected-top-card" id="changeNeedBtn" title="Tap to change what you need">
+        <span class="need-icon" id="topNeedIcon" aria-hidden="true">🗑️</span>
+        <span class="need-text">
+          <span class="need-main" id="topNeedMain">Toss something</span>
+          <span class="need-sub" id="topNeedSub">Nearest trash can</span>
+        </span>
+        <span class="need-change-label">Change</span>
+      </button>
+    </div>
 
-	<style>
-		.finder-container { text-align: center; padding: 2rem 0; }
-		.button-grid { 
-    display: flex;
-    flex-direction: column; /* This stacks them vertically */
-    gap: 12px; 
-    margin-top: 2rem;
-    width: 100%;
-    max-width: 400px; /* Keeps the buttons from getting too wide on desktop */
-    margin-left: auto;
-    margin-right: auto;
-}
+    <!-- STEP 1: "I need to..." -->
+    <section class="screen active" id="screen-need" aria-labelledby="needHeading">
+      <div class="screen-inner">
+        <h1 class="hero-title" id="needHeading">I need to…</h1>
 
-.action-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 18px;
-    font-size: 1.3rem;
-    border-radius: 12px;
-    border: 2px solid rgb(var(--gray-light));
-    background: white;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-}
+        <div class="need-grid">
+          <button type="button" class="need-card" data-need="garbage_can">
+            <span class="need-icon" aria-hidden="true">🗑️</span>
+            <span class="need-text">
+              <span class="need-main">Toss something</span>
+              <span class="need-sub">Nearest trash can</span>
+            </span>
+            <span class="need-arrow">→</span>
+          </button>
 
-.action-btn:hover {
-    border-color: var(--accent);
-    transform: translateY(-2px);
-}
-		.action-btn:active { transform: scale(0.95); background: #eee; }
-		.hidden { display: none; }
-		.directions-btn {
-			display: inline-block;
-			margin-top: 1rem;
-			padding: 10px 20px;
-			background: black;
-			color: white;
-			text-decoration: none;
-			border-radius: 8px;
-		}
-	</style>
+          <button type="button" class="need-card" data-need="bench">
+            <span class="need-icon" aria-hidden="true">
+              <img src="/bench-icon-28943-512.png" alt="" class="need-bench-img" />
+            </span>
+            <span class="need-text">
+              <span class="need-main">Sit down</span>
+              <span class="need-sub">Nearest bench or seat</span>
+            </span>
+            <span class="need-arrow">→</span>
+          </button>
 
-	<script>
-  import amenityData from '../data/amenities.json';
+          <button type="button" class="need-card" data-need="water_fountain">
+            <span class="need-icon" aria-hidden="true">🚰</span>
+            <span class="need-text">
+              <span class="need-main">Hydrate</span>
+              <span class="need-sub">Nearest water fountain</span>
+            </span>
+            <span class="need-arrow">→</span>
+          </button>
 
-  // This ensures the code only runs AFTER the page is fully loaded
-  document.addEventListener('astro:page-load', () => {
-    initFinder();
-  }, { once: false });
+          <button type="button" class="need-card" data-need="bathroom">
+            <span class="need-icon" aria-hidden="true">🚻</span>
+            <span class="need-text">
+              <span class="need-main">Go potty</span>
+              <span class="need-sub">Nearest open bathroom</span>
+            </span>
+            <span class="need-arrow">→</span>
+          </button>
+        </div>
+      </div>
+    </section>
 
-  // Fallback for standard loading
-  document.addEventListener('DOMContentLoaded', () => {
-    initFinder();
-  });
+    <!-- STEP 2: Location ("Where are you?") -->
+    <section class="screen" id="screen-location" aria-labelledby="locHeading">
+      <div class="screen-inner">
+        <h1 class="hero-title" id="locHeading">Where are you?</h1>
 
-  function initFinder() {
-    console.log("Finder logic initialized");
-    const buttons = document.querySelectorAll('.action-btn');
-    
-    buttons.forEach(button => {
-      button.addEventListener('click', () => {
-        const type = button.getAttribute('data-type');
-        console.log("Button clicked:", type);
-        findNearest(type);
-      });
-    });
-  }
+        <button type="button" class="primary-cta-btn" id="shareGpsBtn">
+          <span class="cta-icon">📍</span>
+          <span>Use my current location</span>
+        </button>
+        <p class="gps-status-msg hidden" id="gpsStatusMsg"></p>
 
-  function findNearest(category) {
-    navigator.geolocation.getCurrentPosition((position) => {
-      const { latitude, longitude } = position.coords;
-      
-      const matches = amenityData.features.filter(f => f.properties.type === category);
-      
-      let nearest = null;
-      let minDistance = Infinity;
+        <div class="divider"><span>or</span></div>
 
-      for (const point of matches) {
-        const [lon, lat] = point.geometry.coordinates;
-        // Simple distance math
-        const dist = Math.sqrt(Math.pow(lat - latitude, 2) + Math.pow(lon - longitude, 2));
-        if (dist < minDistance) {
-          minDistance = dist;
-          nearest = point;
+        <form id="manualAddressForm" class="address-form" autocomplete="off">
+          <div class="autocomplete-wrap">
+            <input
+              type="text"
+              id="manualAddressInput"
+              class="address-input"
+              placeholder="Enter address or intersection (e.g. 18th and Irving)…"
+              autocomplete="off"
+              aria-autocomplete="list"
+              aria-controls="addressSuggestionsList"
+            />
+            <ul class="suggestions-list hidden" id="addressSuggestionsList" role="listbox"></ul>
+          </div>
+          <button type="submit" class="secondary-cta-btn" id="manualAddressSubmitBtn">
+            Find Closest →
+          </button>
+        </form>
+      </div>
+    </section>
+
+    <!-- STEP 3: Result ("Here is the closest open one") -->
+    <section class="screen" id="screen-result" aria-labelledby="resName">
+      <div class="screen-inner">
+        <div class="distance-pill-row">
+          <span class="distance-pill" id="resDistancePill">Walking time</span>
+          <button type="button" class="change-loc-link" id="changeLocBtn">Change location</button>
+        </div>
+
+        <div class="result-card">
+          <h1 class="res-title" id="resName">Amenity Name</h1>
+          <div class="res-container-box hidden" id="resContainerBox"></div>
+          <div class="res-address" id="resAddress">Address</div>
+          <div class="res-closing-banner" id="resClosingBanner"></div>
+        </div>
+
+        <!-- Small Map showing Start Pin ("You are here") + Amenity Icon + Satellite Toggle -->
+        <div class="small-map-card">
+          <div class="map-wrap">
+            <div id="smallMap" class="small-map" role="application" aria-label="Map showing your location and the amenity"></div>
+            <button type="button" class="sat-toggle-btn" id="satToggleBtn">
+              🛰️ Satellite
+            </button>
+          </div>
+          <div class="map-legend">
+            <span><span class="legend-dot start-dot"></span> You are here</span>
+            <span>Tap any pin for details or to select</span>
+          </div>
+        </div>
+
+        <!-- Primary Action: Directions (opens Maps app) -->
+        <a
+          href="#"
+          target="_blank"
+          rel="noopener"
+          class="primary-cta-btn directions-btn"
+          id="openDirectionsBtn"
+        >
+          <span class="cta-icon">🧭</span>
+          <span>Directions</span>
+        </a>
+
+        <!-- Secondary Action: It's not here! -->
+        <button type="button" class="not-here-btn" id="notHereBtn">
+          🚫 It's not here!
+        </button>
+      </div>
+    </section>
+
+    <!-- STEP 4: "It's not here!" -> (1) Next Nearest, (2) Report the Issue -->
+    <section class="screen" id="screen-missing" aria-labelledby="missingHeading">
+      <div class="screen-inner">
+        <h1 class="hero-title" id="missingHeading">It's not there?</h1>
+
+        <!-- Option 1: Find the next nearest option based on new location -->
+        <div class="action-choice-card highlight-choice">
+          <div class="choice-header">
+            <h2 class="choice-title">Find the next nearest option</h2>
+            <p class="choice-desc" id="nextNearestDesc">
+              Searches from where you are now.
+            </p>
+          </div>
+          <button type="button" class="primary-cta-btn" id="findNextNearestBtn">
+            <span>👉 Next nearest open option</span>
+          </button>
+        </div>
+
+        <!-- Option 2: Report the issue -->
+        <div class="action-choice-card">
+          <div class="choice-header">
+            <h2 class="choice-title">Report the issue</h2>
+            <p class="choice-desc" id="reportDatasetSummary"></p>
+          </div>
+          <a href="#" class="secondary-cta-btn report-email-btn" id="emailDataSfDirectBtn">
+            ✉️ Email DataSF (Pre-filled)
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- Subtle App Feedback Footer -->
+    <footer class="app-footer">
+      <button type="button" class="feedback-trigger-btn" id="openFeedbackBtn">
+        💬 Send app feedback
+      </button>
+    </footer>
+  </div>
+
+  <hr />
+
+  <!-- Project Backstory & Data Sources -->
+  <div class="project-context">
+    <section class="context-section">
+      <h2>Why I Built This</h2>
+      <p>
+        When you're out walking or biking in San Francisco and have an immediate, everyday need—a trash can to toss something, a bench to sit down, a water fountain to hydrate, or an actually <em>open</em> bathroom—finding the nearest option shouldn't require digging through complex GIS portals or walking up to a locked door.
+      </p>
+      <p>
+        City data for these basic public micro-amenities exists on San Francisco's open data portal, but it's split across multiple departments (for example, sidewalk trash cans maintained by Public Works vs. park trash cans maintained by Recreation &amp; Parks). Raw datasets also miss how people actually use public space: a <strong>San Francisco Public Library branch</strong> isn't just a book catalog—during open hours, it provides a bathroom, a water fountain, a trash bin, and a place to sit.
+      </p>
+      <p>
+        I designed this tool around four simple questions: <em>What do you need? Where are you? Where is the closest open one (and when does it close)?</em> And if you get there and the amenity is missing: <em>Take me to the next closest one right away, and let me report the bad data point with one tap.</em>
+      </p>
+      <p class="standalone-note">
+        📱 <strong>Standalone Mobile App URL:</strong> <a href="https://sf-public-amenities.netlify.app" target="_blank" rel="noopener noreferrer">sf-public-amenities.netlify.app ↗</a>
+      </p>
+    </section>
+
+    <section class="context-section">
+      <h2>DataSF Open Data Sources Used</h2>
+      <div class="dataset-grid">
+        <div class="dataset-card">
+          <div class="dataset-head">
+            <h3>San Francisco Public Bathrooms &amp; Water Fountains</h3>
+            <a href="https://data.sf.gov/d/wfq4-upmv" target="_blank" rel="noopener noreferrer" class="dataset-badge">wfq4-upmv ↗</a>
+          </div>
+          <p>
+            Combines public restrooms, staffed <em>Pit Stop</em> toilets, JCDecaux automatic toilets, and drinking water fountains / bottle fillers managed across SF Recreation &amp; Parks, Public Works, SFPUC (<em>DrinkTap</em>), the Port of San Francisco, and SF Public Library.
+          </p>
+        </div>
+
+        <div class="dataset-card">
+          <div class="dataset-head">
+            <h3>Trash Can Locations (SF Public Works)</h3>
+            <a href="https://data.sf.gov/d/5buk-jp7b" target="_blank" rel="noopener noreferrer" class="dataset-badge">5buk-jp7b ↗</a>
+          </div>
+          <p>
+            Tracks ~1,970 active public sidewalk trash receptacles maintained by San Francisco Public Works and Recology, along with 1,400+ street intersection records used to power the app's live intersection autofiller.
+          </p>
+        </div>
+
+        <div class="dataset-card">
+          <div class="dataset-head">
+            <h3>Assets Maintained by the Recreation &amp; Parks Dept</h3>
+            <a href="https://data.sf.gov/d/e3jj-mbb3" target="_blank" rel="noopener noreferrer" class="dataset-badge">e3jj-mbb3 ↗</a>
+          </div>
+          <p>
+            Supplies ~3,830 park benches, memorial benches, and picnic tables—plus ~1,270 park trash cans—spatially cross-referenced with park names, addresses, and operating hours.
+          </p>
+        </div>
+
+        <div class="dataset-card">
+          <div class="dataset-head">
+            <h3>Public Library Facilities &amp; Branch Schedules</h3>
+            <a href="https://data.sf.gov/d/nc68-ngbr" target="_blank" rel="noopener noreferrer" class="dataset-badge">nc68-ngbr ↗</a>
+          </div>
+          <p>
+            Models all 28 San Francisco Public Library branches as composite multi-amenity hubs (supplying indoor restrooms, drinking water, trash bins, and seating) evaluated in real time against each branch's daily schedule in Pacific Time.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Changelog Drawer -->
+    <section class="changelog-drawer">
+      <details>
+        <summary>View Recent Updates &amp; Technical Decisions</summary>
+        <div class="changelog-content">
+          <h4>[2026-11-05] — Step-by-Step Flow, Live Intersection Autofiller &amp; Interactive Map</h4>
+          <p><strong>What Changed:</strong></p>
+          <ul>
+            <li>Redesigned into a focused 4-step mobile flow (Need → Location → Closest Open Result + Map → Missing/Fallback).</li>
+            <li>Built a unified DataSF pipeline (7,560 SF amenities across <code>wfq4-upmv</code>, <code>5buk-jp7b</code>, <code>e3jj-mbb3</code>, and all 28 SFPL branches with live closing countdowns).</li>
+            <li>Added a live intersection autofiller combining 1,424 canonical DataSF street corners with OpenStreetMap Overpass node intersection queries (so typing <code>18th and irving</code> resolves directly to <code>18th Avenue and Irving Street</code> rather than a street midpoint).</li>
+            <li>Added an interactive result map with Satellite view toggle, clickable nearby open amenities within a 1-mile radius, and a one-tap pre-filled DataSF error report.</li>
+          </ul>
+          <h4>[2026-10-23] — SFPL Integration, Schedule Filtering &amp; Deduplication</h4>
+          <p><strong>What Changed:</strong></p>
+          <ul>
+            <li>Integrated SFPL branches across Restrooms, Water Fountains, Waste Disposal, and Seating.</li>
+            <li>Implemented client-side schedule validation pinned to Pacific Time (<code>America/Los_Angeles</code>).</li>
+          </ul>
+        </div>
+      </details>
+    </section>
+  </div>
+
+  <!-- Anti-Spam Feedback Modal -->
+  <div class="modal-backdrop hidden" id="feedbackModalBackdrop" role="dialog" aria-modal="true" aria-labelledby="feedbackModalTitle">
+    <div class="modal-card">
+      <div class="modal-top">
+        <h2 class="choice-title" id="feedbackModalTitle">Send Feedback</h2>
+        <button type="button" class="modal-close-x" id="closeFeedbackBtn" aria-label="Close">✕</button>
+      </div>
+      <form id="feedbackForm" class="feedback-form">
+        <div class="hp-wrap" aria-hidden="true">
+          <label for="hpWebsiteField">Leave this field blank</label>
+          <input type="text" id="hpWebsiteField" name="website_url" tabindex="-1" autocomplete="off" />
+        </div>
+        <textarea
+          id="feedbackMessageInput"
+          class="feedback-textarea"
+          placeholder="What worked well, or what could be improved?"
+          required
+        ></textarea>
+        <button type="submit" class="primary-cta-btn">
+          Send Feedback →
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <style is:global>
+    :root {
+      --bg-page: #fafafa;
+      --bg-card: #ffffff;
+      --text-main: #0f172a;
+      --text-secondary: #475569;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+      --primary: #0284c7;
+      --primary-hover: #0369a1;
+      --primary-soft: #e0f2fe;
+      --green: #15803d;
+      --green-bg: #dcfce7;
+      --amber: #b45309;
+      --amber-bg: #fef3c7;
+      --red: #b91c1c;
+      --red-bg: #fef2f2;
+      --radius-md: 14px;
+      --radius-lg: 20px;
+      --shadow: 0 4px 18px rgba(15, 23, 42, 0.07);
+    }
+
+    .wizard-shell {
+      max-width: 480px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .selected-need-Slot {
+      padding: 4px 0 12px;
+    }
+
+    .need-card.selected-top-card {
+      padding: 12px 16px;
+      border-color: var(--primary);
+      background: var(--bg-card);
+    }
+
+    .need-card.selected-top-card .need-icon {
+      width: 44px;
+      height: 44px;
+      font-size: 1.5rem;
+      border-radius: 12px;
+    }
+
+    .need-card.selected-top-card .need-main {
+      font-size: 1.05rem;
+    }
+
+    .need-card.selected-top-card .need-sub {
+      font-size: 0.78rem;
+    }
+
+    .need-change-label {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--primary);
+      background: var(--primary-soft);
+      padding: 5px 10px;
+      border-radius: 999px;
+    }
+
+    .screen {
+      display: none;
+      padding: 8px 0 24px;
+    }
+
+    .screen.active {
+      display: block;
+      animation: fadeIn 0.15s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .screen-inner {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .hero-title {
+      font-size: 1.85rem;
+      font-weight: 900;
+      letter-spacing: -0.03em;
+      color: var(--text-main);
+      line-height: 1.15;
+      margin: 0;
+    }
+
+    .need-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 4px;
+    }
+
+    .need-card {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      width: 100%;
+      padding: 18px 20px;
+      background: var(--bg-card);
+      border: 2px solid var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow);
+      cursor: pointer;
+      text-align: left;
+      transition: transform 0.12s ease, border-color 0.12s ease;
+    }
+
+    .need-card:hover,
+    .need-card:focus-visible {
+      border-color: var(--primary);
+      transform: translateY(-1px);
+    }
+
+    .need-card:active {
+      transform: scale(0.99);
+    }
+
+    .need-icon {
+      width: 54px;
+      height: 54px;
+      border-radius: 16px;
+      background: #f1f5f9;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.85rem;
+      flex-shrink: 0;
+    }
+
+    .need-bench-img {
+      width: 30px;
+      height: 30px;
+      object-fit: contain;
+    }
+
+    .need-text {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .need-main {
+      font-size: 1.22rem;
+      font-weight: 800;
+      color: var(--text-main);
+    }
+
+    .need-sub {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .need-arrow {
+      font-size: 1.25rem;
+      font-weight: 800;
+      color: var(--primary);
+    }
+
+    .primary-cta-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      width: 100%;
+      padding: 16px 20px;
+      border-radius: var(--radius-md);
+      border: none;
+      background: var(--primary);
+      color: #ffffff;
+      font-size: 1.05rem;
+      font-weight: 800;
+      text-decoration: none;
+      cursor: pointer;
+      box-shadow: 0 4px 14px rgba(2, 132, 199, 0.28);
+      transition: background 0.15s;
+    }
+
+    .primary-cta-btn:hover {
+      background: var(--primary-hover);
+    }
+
+    .cta-icon {
+      font-size: 1.2rem;
+    }
+
+    .gps-status-msg {
+      font-size: 0.85rem;
+      color: var(--amber);
+      background: var(--amber-bg);
+      padding: 10px 12px;
+      border-radius: 10px;
+      font-weight: 600;
+    }
+
+    .divider {
+      display: flex;
+      align-items: center;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      font-weight: 600;
+      margin: 2px 0;
+    }
+
+    .divider::before,
+    .divider::after {
+      content: "";
+      flex: 1;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .divider span {
+      padding: 0 10px;
+    }
+
+    .address-form {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .autocomplete-wrap {
+      position: relative;
+      width: 100%;
+    }
+
+    .suggestions-list {
+      list-style: none;
+      margin: 6px 0 0;
+      padding: 0;
+      background: var(--bg-card);
+      border: 2px solid var(--primary);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      max-height: 240px;
+      overflow-y: auto;
+    }
+
+    .suggestion-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      font-size: 0.92rem;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .suggestion-item:last-child {
+      border-bottom: none;
+    }
+
+    .suggestion-item:hover,
+    .suggestion-item.active {
+      background: var(--primary-soft);
+      color: var(--primary-hover);
+    }
+
+    .suggestion-sub {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+
+    .address-input {
+      width: 100%;
+      padding: 14px 16px;
+      border: 2px solid var(--border);
+      border-radius: var(--radius-md);
+      font-size: 1rem;
+      background: var(--bg-card);
+      color: var(--text-main);
+      outline: none;
+      box-sizing: border-box;
+    }
+
+    .address-input:focus {
+      border-color: var(--primary);
+    }
+
+    .secondary-cta-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      padding: 14px 18px;
+      border-radius: var(--radius-md);
+      border: 2px solid var(--text-main);
+      background: var(--text-main);
+      color: #ffffff;
+      font-size: 0.98rem;
+      font-weight: 800;
+      text-decoration: none;
+      text-align: center;
+      cursor: pointer;
+      box-sizing: border-box;
+    }
+
+    .distance-pill-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .distance-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--green-bg);
+      color: var(--green);
+      font-size: 0.9rem;
+      font-weight: 800;
+      padding: 6px 13px;
+      border-radius: 999px;
+    }
+
+    .change-loc-link {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+
+    .result-card {
+      background: var(--bg-card);
+      border: 2px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 18px;
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .res-title {
+      font-size: 1.4rem;
+      font-weight: 900;
+      color: var(--text-main);
+      line-height: 1.2;
+      margin: 0;
+    }
+
+    .res-container-box {
+      background: #f1f5f9;
+      border-left: 4px solid var(--primary);
+      padding: 8px 12px;
+      border-radius: 6px 10px 10px 6px;
+      font-size: 0.88rem;
+      color: var(--text-main);
+      font-weight: 700;
+    }
+
+    .res-address {
+      font-size: 0.98rem;
+      color: var(--text-secondary);
+      font-weight: 600;
+    }
+
+    .res-closing-banner {
+      margin-top: 2px;
+      padding: 9px 12px;
+      border-radius: 10px;
+      font-size: 0.88rem;
+      font-weight: 700;
+    }
+
+    .res-closing-banner.open-24 {
+      background: var(--green-bg);
+      color: var(--green);
+    }
+
+    .res-closing-banner.closes-later {
+      background: var(--primary-soft);
+      color: var(--primary-hover);
+    }
+
+    .res-closing-banner.closes-soon {
+      background: var(--amber-bg);
+      color: var(--amber);
+    }
+
+    .small-map-card {
+      background: var(--bg-card);
+      border: 2px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+
+    .map-wrap {
+      position: relative;
+    }
+
+    .small-map {
+      width: 100%;
+      height: 225px;
+    }
+
+    .sat-toggle-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 500;
+      background: rgba(15, 23, 42, 0.85);
+      color: #ffffff;
+      border: 1.5px solid rgba(255, 255, 255, 0.7);
+      padding: 6px 11px;
+      border-radius: 999px;
+      font-size: 0.76rem;
+      font-weight: 800;
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+    }
+
+    .sat-toggle-btn:hover {
+      background: #0f172a;
+    }
+
+    .map-legend {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 14px;
+      background: #f8fafc;
+      border-top: 1px solid var(--border);
+      font-size: 0.76rem;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    .legend-dot {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 4px;
+    }
+
+    .legend-dot.start-dot {
+      background: #ef4444;
+      border: 2px solid #fff;
+      box-shadow: 0 0 0 2px #ef4444;
+    }
+
+    .directions-btn {
+      background: #16a34a;
+      box-shadow: 0 4px 14px rgba(22, 163, 74, 0.3);
+      box-sizing: border-box;
+    }
+
+    .directions-btn:hover {
+      background: #15803d;
+    }
+
+    .not-here-btn {
+      width: 100%;
+      padding: 13px 16px;
+      border-radius: var(--radius-md);
+      border: 1.5px solid #fecaca;
+      background: var(--red-bg);
+      color: var(--red);
+      font-size: 0.92rem;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .not-here-btn:hover {
+      background: #fee2e2;
+    }
+
+    .you-are-here-pin {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .you-are-here-bubble {
+      background: #ef4444;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 800;
+      padding: 2px 7px;
+      border-radius: 999px;
+      white-space: nowrap;
+      border: 2px solid #fff;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.28);
+    }
+
+    .you-are-here-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #ef4444;
+      border: 3px solid #ffffff;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+      margin-top: 2px;
+    }
+
+    .dest-amenity-pin {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background: var(--primary);
+      border: 3px solid #ffffff;
+      box-shadow: 0 3px 12px rgba(2, 132, 199, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+    }
+
+    .dest-amenity-pin img {
+      width: 22px;
+      height: 22px;
+      object-fit: contain;
+      filter: brightness(0) invert(1);
+    }
+
+    .nearby-amenity-pin {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: #ffffff;
+      border: 2.5px solid var(--primary);
+      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.25);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      cursor: pointer;
+      transition: transform 0.12s ease;
+    }
+
+    .nearby-amenity-pin:hover {
+      transform: scale(1.15);
+    }
+
+    .nearby-amenity-pin img {
+      width: 15px;
+      height: 15px;
+      object-fit: contain;
+    }
+
+    .action-choice-card {
+      background: var(--bg-card);
+      border: 2px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 18px;
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .action-choice-card.highlight-choice {
+      border-color: var(--primary);
+      background: linear-gradient(to bottom, #ffffff, #f0f9ff);
+    }
+
+    .choice-title {
+      font-size: 1.15rem;
+      font-weight: 900;
+      color: var(--text-main);
+      margin: 0 0 4px;
+    }
+
+    .choice-desc {
+      font-size: 0.86rem;
+      color: var(--text-secondary);
+      margin: 0;
+    }
+
+    .app-footer {
+      padding: 8px 0 16px;
+      text-align: center;
+    }
+
+    .feedback-trigger-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 6px 12px;
+      border-radius: 999px;
+    }
+
+    .feedback-trigger-btn:hover {
+      color: var(--primary);
+      background: #e2e8f0;
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.5);
+      backdrop-filter: blur(2px);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+    }
+
+    .modal-card {
+      background: var(--bg-card);
+      width: 100%;
+      max-width: 420px;
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      box-shadow: 0 12px 32px rgba(15, 23, 42, 0.2);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      box-sizing: border-box;
+    }
+
+    .modal-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .modal-close-x {
+      background: #f1f5f9;
+      border: 1px solid var(--border);
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+
+    .feedback-form {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .feedback-textarea {
+      width: 100%;
+      min-height: 100px;
+      padding: 12px;
+      border: 2px solid var(--border);
+      border-radius: var(--radius-md);
+      font-family: inherit;
+      font-size: 0.95rem;
+      resize: vertical;
+      outline: none;
+      box-sizing: border-box;
+    }
+
+    .feedback-textarea:focus {
+      border-color: var(--primary);
+    }
+
+    .hp-wrap {
+      position: absolute;
+      left: -9999px;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .changelog-drawer {
+      margin: 1.5rem 0 0;
+      text-align: left;
+      border-top: 1px solid var(--border);
+      padding-top: 1.25rem;
+      font-size: 0.88rem;
+      color: #555;
+    }
+
+    .changelog-drawer summary {
+      cursor: pointer;
+      font-weight: 600;
+      color: #222;
+      user-select: none;
+    }
+
+    .changelog-content {
+      margin-top: 1rem;
+      line-height: 1.5;
+      background: rgba(0, 0, 0, 0.02);
+      padding: 1rem;
+      border-radius: 8px;
+    }
+
+    .changelog-content h4 {
+      margin: 0 0 0.5rem 0;
+      font-size: 0.95rem;
+      color: #111;
+    }
+
+    .changelog-content ul {
+      padding-left: 1.25rem;
+      margin: 0.5rem 0 1rem 0;
+    }
+
+    .changelog-content li {
+      margin-bottom: 0.35rem;
+    }
+
+    /* Project Backstory & DataSF Sources */
+    .project-context {
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+      margin-top: 1rem;
+    }
+
+    .context-section h2 {
+      font-size: 1.45rem;
+      margin: 0 0 0.75rem 0;
+      color: var(--text-main);
+    }
+
+    .context-section p {
+      color: #334155;
+      line-height: 1.65;
+      margin: 0 0 0.9rem 0;
+      font-size: 0.98rem;
+    }
+
+    .standalone-note {
+      background: #f0f9ff;
+      border: 1px solid #bae6fd;
+      border-radius: 10px;
+      padding: 0.75rem 1rem;
+      font-size: 0.92rem !important;
+      color: #0c4a6e !important;
+    }
+
+    .standalone-note a {
+      color: #0284c7;
+      font-weight: 700;
+      text-decoration: none;
+    }
+
+    .standalone-note a:hover {
+      text-decoration: underline;
+    }
+
+    .dataset-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 14px;
+    }
+
+    .dataset-card {
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.1rem;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+    }
+
+    .dataset-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 0.5rem;
+    }
+
+    .dataset-head h3 {
+      margin: 0;
+      font-size: 1rem;
+      line-height: 1.3;
+      color: var(--text-main);
+    }
+
+    .dataset-badge {
+      flex-shrink: 0;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #0369a1;
+      background: #e0f2fe;
+      padding: 3px 8px;
+      border-radius: 6px;
+      text-decoration: none;
+    }
+
+    .dataset-badge:hover {
+      background: #bae6fd;
+    }
+
+    .dataset-card p {
+      margin: 0;
+      font-size: 0.88rem;
+      color: #475569;
+      line-height: 1.5;
+    }
+  </style>
+
+  <script is:inline src="/sf_amenities.js"></script>
+  <script
+    is:inline
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
+  <script is:inline>
+    (function () {
+      "use strict";
+
+      const payload = window.SF_AMENITIES_DATA || { amenities: [], datasets: {}, intersections: [] };
+      const allAmenities = payload.amenities || [];
+      const datasetMeta = payload.datasets || {};
+      const sfIntersections = payload.intersections || [];
+
+      const NEED_META = {
+        garbage_can: {
+          mainText: "Toss something",
+          subText: "Nearest trash can",
+          genericName: "Public Trash Can",
+          libraryResourceName: "Indoor Trash & Recycling Bin",
+          emoji: "🗑️",
+          useBenchImg: false,
+        },
+        bench: {
+          mainText: "Sit down",
+          subText: "Nearest bench or seat",
+          genericName: "Public Bench / Seat",
+          libraryResourceName: "Indoor Library Seating",
+          emoji: "🪑",
+          useBenchImg: true,
+        },
+        water_fountain: {
+          mainText: "Hydrate",
+          subText: "Nearest water fountain",
+          genericName: "Drinking Water Fountain",
+          libraryResourceName: "Indoor Water Fountain",
+          emoji: "🚰",
+          useBenchImg: false,
+        },
+        bathroom: {
+          mainText: "Go potty",
+          subText: "Nearest open bathroom",
+          genericName: "Public Bathroom",
+          libraryResourceName: "Indoor Public Restroom",
+          emoji: "🚻",
+          useBenchImg: false,
+        },
+      };
+
+      const ONE_MILE_METERS = 1609.344;
+
+      const state = {
+        step: "need",
+        need: null,
+        userLat: null,
+        userLon: null,
+        userLocationLabel: "",
+        currentMatch: null,
+        originalResultCoords: null,
+        nearbyWithinMile: [],
+        skippedIds: new Set(),
+        isSatellite: false,
+        humanVerified: false,
+      };
+
+      function updateTopNeedCard() {
+        const slot = document.getElementById("selectedNeedHeader");
+        if (!slot) return;
+
+        if (!state.need || state.step === "need") {
+          slot.classList.add("hidden");
+          return;
+        }
+
+        const meta = NEED_META[state.need];
+        if (!meta) return;
+
+        const iconEl = document.getElementById("topNeedIcon");
+        const mainEl = document.getElementById("topNeedMain");
+        const subEl = document.getElementById("topNeedSub");
+
+        if (iconEl) {
+          iconEl.innerHTML = meta.useBenchImg
+            ? `<img src="/bench-icon-28943-512.png" alt="" class="need-bench-img" />`
+            : meta.emoji;
+        }
+        if (mainEl) mainEl.textContent = meta.mainText;
+        if (subEl) subEl.textContent = meta.subText;
+
+        slot.classList.remove("hidden");
+      }
+
+      function showScreen(stepName) {
+        state.step = stepName;
+        document.querySelectorAll(".screen").forEach((el) => el.classList.remove("active"));
+        const target = document.getElementById(`screen-${stepName}`);
+        if (target) target.classList.add("active");
+
+        updateTopNeedCard();
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+
+      function getSfNow() {
+        const now = new Date();
+        const fmt = new Intl.DateTimeFormat("en-US", {
+          timeZone: "America/Los_Angeles",
+          weekday: "short",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        });
+        const parts = {};
+        for (const p of fmt.formatToParts(now)) {
+          parts[p.type] = p.value;
+        }
+        const dayMap = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+        const dayIndex = dayMap[parts.weekday] ?? now.getDay();
+        let hour = parseInt(parts.hour || "0", 10);
+        if (hour === 24) hour = 0;
+        const minute = parseInt(parts.minute || "0", 10);
+        return {
+          dayIndex,
+          weekdayShort: parts.weekday || "Today",
+          minutesOfDay: hour * 60 + minute,
+        };
+      }
+
+      function parseHhmm(hhmm) {
+        if (!hhmm) return null;
+        const [hStr, mStr] = hhmm.split(":");
+        const h = parseInt(hStr, 10);
+        const m = parseInt(mStr || "0", 10);
+        if (isNaN(h)) return null;
+        return h * 60 + (isNaN(m) ? 0 : m);
+      }
+
+      function formatTime12h(totalMin) {
+        if (totalMin <= 0 || totalMin >= 1440) return "midnight";
+        const h = Math.floor(totalMin / 60) % 24;
+        const m = totalMin % 60;
+        const ampm = h < 12 ? "am" : "pm";
+        const h12 = h % 12 === 0 ? 12 : h % 12;
+        return m === 0 ? `${h12}${ampm}` : `${h12}:${String(m).padStart(2, "0")}${ampm}`;
+      }
+
+      function formatDurationRemaining(minsLeft) {
+        if (minsLeft < 60) {
+          return `in ${minsLeft} minute${minsLeft === 1 ? "" : "s"}`;
+        }
+        const hrs = Math.floor(minsLeft / 60);
+        const mins = minsLeft % 60;
+        if (mins === 0) {
+          return `in ${hrs} hour${hrs === 1 ? "" : "s"}`;
+        }
+        return `in ${hrs} hr ${mins} min`;
+      }
+
+      function evaluateAmenityAccess(item, sfNow) {
+        if (item.outOfService) {
+          return { isOpen: false };
+        }
+
+        if (item.isLibrary && item.librarySchedule) {
+          const todayRange = item.librarySchedule[String(sfNow.dayIndex)];
+          if (!todayRange || todayRange.length < 2) {
+            return { isOpen: false };
+          }
+          const openMin = parseHhmm(todayRange[0]);
+          const closeMin = parseHhmm(todayRange[1]);
+          const cur = sfNow.minutesOfDay;
+          if (openMin !== null && closeMin !== null && cur >= openMin && cur < closeMin) {
+            const minsLeft = closeMin - cur;
+            return {
+              isOpen: true,
+              is24h: false,
+              minsLeft,
+              closingText: `🕒 Closes at ${formatTime12h(closeMin)} (${formatDurationRemaining(minsLeft)})`,
+              bannerClass: minsLeft <= 45 ? "closes-soon" : "closes-later",
+            };
+          }
+          return { isOpen: false };
+        }
+
+        if (item.days === "Special Events") {
+          return { isOpen: false };
+        }
+
+        if (item.days === "Weekdays" && (sfNow.dayIndex === 0 || sfNow.dayIndex === 6)) {
+          return { isOpen: false };
+        }
+
+        const openMin = parseHhmm(item.hoursOpen);
+        const closeMin = parseHhmm(item.hoursClose);
+        if (openMin !== null && closeMin !== null) {
+          if (openMin === 0 && closeMin >= 1440) {
+            return {
+              isOpen: true,
+              is24h: true,
+              minsLeft: null,
+              closingText: "",
+              bannerClass: "open-24",
+            };
+          }
+
+          const cur = sfNow.minutesOfDay;
+          const isOvernight = openMin > closeMin;
+          const isOpen = isOvernight
+            ? cur >= openMin || cur < closeMin
+            : cur >= openMin && cur < closeMin;
+
+          if (!isOpen) {
+            return { isOpen: false };
+          }
+
+          const minsLeft = isOvernight
+            ? cur >= openMin
+              ? 1440 - cur + closeMin
+              : closeMin - cur
+            : closeMin - cur;
+
+          return {
+            isOpen: true,
+            is24h: false,
+            minsLeft,
+            closingText: `🕒 Closes at ${formatTime12h(closeMin)} (${formatDurationRemaining(minsLeft)})`,
+            bannerClass: minsLeft <= 45 ? "closes-soon" : "closes-later",
+          };
+        }
+
+        return {
+          isOpen: true,
+          is24h: true,
+          minsLeft: null,
+          closingText: "",
+          bannerClass: "open-24",
+        };
+      }
+
+      function haversineMeters(lat1, lon1, lat2, lon2) {
+        const R = 6371000;
+        const toRad = (d) => (d * Math.PI) / 180;
+        const dLat = toRad(lat2 - lat1);
+        const dLon = toRad(lon2 - lon1);
+        const a =
+          Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+          Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      }
+
+      function formatDistancePill(meters) {
+        const feet = Math.round(meters * 3.28084);
+        const miles = meters / 1609.344;
+        const walkMins = Math.max(1, Math.round(meters / 78));
+        const distStr = feet < 1000 ? `${feet} ft` : `${miles.toFixed(2)} mi`;
+        return `🚶 ~${walkMins} min walk (${distStr})`;
+      }
+
+      function findClosestOpenAmenity() {
+        const sfNow = getSfNow();
+        let best = null;
+
+        for (const item of allAmenities) {
+          if (!item.categories.includes(state.need)) continue;
+          if (state.skippedIds.has(item.id)) continue;
+
+          const access = evaluateAmenityAccess(item, sfNow);
+          if (!access.isOpen) continue;
+
+          const distMeters = haversineMeters(state.userLat, state.userLon, item.lat, item.lon);
+          if (!best || distMeters < best.distMeters) {
+            best = { item, access, distMeters };
+          }
+        }
+        return best;
+      }
+
+      function computeNearbyWithinOneMile(anchorLat, anchorLon) {
+        const sfNow = getSfNow();
+        const list = [];
+
+        for (const item of allAmenities) {
+          if (!item.categories.includes(state.need)) continue;
+          if (state.skippedIds.has(item.id)) continue;
+
+          const distFromOriginal = haversineMeters(anchorLat, anchorLon, item.lat, item.lon);
+          if (distFromOriginal > ONE_MILE_METERS) continue;
+
+          const access = evaluateAmenityAccess(item, sfNow);
+          if (!access.isOpen) continue;
+
+          const distFromUser = haversineMeters(state.userLat, state.userLon, item.lat, item.lon);
+          list.push({
+            item,
+            access,
+            distMeters: distFromUser,
+            distFromOriginal,
+          });
+        }
+
+        list.sort((a, b) => a.distFromOriginal - b.distFromOriginal);
+        return list;
+      }
+
+      function describeResourceAndContainer(item, needKey) {
+        const meta = NEED_META[needKey] || NEED_META.bathroom;
+
+        if (item.isLibrary) {
+          return {
+            resourceName: meta.libraryResourceName,
+            containerText: `Inside: ${item.name}`,
+            sourceTooltip: `Maintained by: ${item.agency} (ID: ${item.uid || item.id})`,
+          };
+        }
+
+        if (item.park) {
+          return {
+            resourceName: item.name,
+            containerText: `Inside: ${item.park}`,
+            sourceTooltip: `Maintained by: ${item.agency} (${item.uid || item.id})`,
+          };
+        }
+
+        if (item.sourceCode === "dpw") {
+          return {
+            resourceName: "Public Sidewalk Trash Can",
+            containerText: "",
+            sourceTooltip: `Maintained by: ${item.agency} (${item.uid || "City Street Can"})`,
+          };
+        }
+
+        return {
+          resourceName: item.name || meta.genericName,
+          containerText: "",
+          sourceTooltip: `Maintained by: ${item.agency} (${item.uid || item.id})`,
+        };
+      }
+
+      let smallMap = null;
+      let streetTiles = null;
+      let satTiles = null;
+      let nearbyLayerGroup = null;
+      let mapLayerGroup = null;
+
+      function ensureSmallMap() {
+        if (smallMap) return;
+
+        smallMap = L.map("smallMap", {
+          zoomControl: true,
+          attributionControl: true,
+        });
+
+        streetTiles = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          maxZoom: 19,
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>',
+        });
+
+        let switchedFallback = false;
+        streetTiles.on("tileerror", function () {
+          if (!switchedFallback) {
+            switchedFallback = true;
+            streetTiles.setUrl(
+              "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}"
+            );
+          }
+        });
+
+        satTiles = L.tileLayer(
+          "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+          {
+            maxZoom: 19,
+            attribution: "Tiles &copy; Esri",
+          }
+        );
+
+        if (state.isSatellite) {
+          satTiles.addTo(smallMap);
+        } else {
+          streetTiles.addTo(smallMap);
+        }
+
+        nearbyLayerGroup = L.layerGroup().addTo(smallMap);
+        mapLayerGroup = L.layerGroup().addTo(smallMap);
+
+        smallMap.on("moveend zoomend", () => {
+          if (state.step === "result" && state.currentMatch) {
+            renderNearbyPinsInView();
+          }
+        });
+      }
+
+      function toggleSatelliteView() {
+        state.isSatellite = !state.isSatellite;
+        const btn = document.getElementById("satToggleBtn");
+        if (btn) {
+          btn.textContent = state.isSatellite ? "🗺️ Street Map" : "🛰️ Satellite";
+        }
+        if (!smallMap) return;
+        if (state.isSatellite) {
+          if (smallMap.hasLayer(streetTiles)) smallMap.removeLayer(streetTiles);
+          satTiles.addTo(smallMap);
+        } else {
+          if (smallMap.hasLayer(satTiles)) smallMap.removeLayer(satTiles);
+          streetTiles.addTo(smallMap);
         }
       }
 
-      if (nearest) {
-        document.getElementById('nearest-name').innerText = nearest.properties.name || "Unnamed location";
-        const link = document.getElementById('directions-link');
-        link.href = `https://www.google.com/maps/dir/?api=1&destination=${nearest.geometry.coordinates[1]},${nearest.geometry.coordinates[0]}`;
-        document.getElementById('result-card').classList.remove('hidden');
-        document.getElementById('status-message').innerText = "";
+      function buildAmenityPopupHtml(item, info) {
+        return `
+          <div style="font-size:0.82rem;line-height:1.35;">
+            <strong>${escapeHtml(info.resourceName)}</strong><br/>
+            ${escapeHtml(item.address || item.neighborhood)}<br/>
+            <span style="color:#475569;font-size:0.75rem;">
+              ${escapeHtml(info.sourceTooltip)}<br/>
+              DataSF Dataset: <code>${escapeHtml(item.datasetId)}</code>
+            </span>
+          </div>
+        `;
       }
-    });
-  }
-</script>
+
+      function renderNearbyPinsInView() {
+        if (!smallMap || !nearbyLayerGroup || !state.currentMatch) return;
+        nearbyLayerGroup.clearLayers();
+
+        const meta = NEED_META[state.need] || NEED_META.bathroom;
+        const activeId = state.currentMatch.item.id;
+        const bounds = smallMap.getBounds().pad(0.15);
+
+        const innerIconHtml = meta.useBenchImg
+          ? `<img src="/bench-icon-28943-512.png" alt="" />`
+          : `<span>${meta.emoji}</span>`;
+
+        let renderedCount = 0;
+        const maxPinsInView = 80;
+
+        for (const entry of state.nearbyWithinMile) {
+          if (entry.item.id === activeId) continue;
+          if (!bounds.contains([entry.item.lat, entry.item.lon])) continue;
+
+          const nearbyIcon = L.divIcon({
+            className: "",
+            html: `<div class="nearby-amenity-pin" title="Tap to select">${innerIconHtml}</div>`,
+            iconSize: [28, 28],
+            iconAnchor: [14, 14],
+          });
+
+          const marker = L.marker([entry.item.lat, entry.item.lon], {
+            icon: nearbyIcon,
+            zIndexOffset: 400,
+          }).addTo(nearbyLayerGroup);
+
+          marker.on("click", () => {
+            selectMatchOnResultScreen(entry, false, true);
+          });
+
+          renderedCount++;
+          if (renderedCount >= maxPinsInView) break;
+        }
+      }
+
+      function renderPrimaryPinsOnMap(startLat, startLon, item, needKey, info, fitMapBounds, openDestPopup) {
+        const meta = NEED_META[needKey] || NEED_META.bathroom;
+        ensureSmallMap();
+        mapLayerGroup.clearLayers();
+
+        const startIcon = L.divIcon({
+          className: "",
+          html: `
+            <div class="you-are-here-pin">
+              <div class="you-are-here-bubble">You are here</div>
+              <div class="you-are-here-dot"></div>
+            </div>
+          `,
+          iconSize: [90, 38],
+          iconAnchor: [45, 34],
+        });
+
+        const startMarker = L.marker([startLat, startLon], {
+          icon: startIcon,
+          zIndexOffset: 900,
+        }).addTo(mapLayerGroup);
+        startMarker.bindPopup(`<strong>You are here</strong><br/>${escapeHtml(state.userLocationLabel)}`);
+
+        const innerIconHtml = meta.useBenchImg
+          ? `<img src="/bench-icon-28943-512.png" alt="Bench" />`
+          : `<span>${meta.emoji}</span>`;
+
+        const destIcon = L.divIcon({
+          className: "",
+          html: `<div class="dest-amenity-pin" title="Tap for source details">${innerIconHtml}</div>`,
+          iconSize: [42, 42],
+          iconAnchor: [21, 21],
+        });
+
+        const destMarker = L.marker([item.lat, item.lon], {
+          icon: destIcon,
+          zIndexOffset: 1000,
+        }).addTo(mapLayerGroup);
+
+        destMarker.bindPopup(buildAmenityPopupHtml(item, info));
+
+        L.polyline(
+          [
+            [startLat, startLon],
+            [item.lat, item.lon],
+          ],
+          {
+            color: "#0284c7",
+            weight: 4,
+            dashArray: "7, 8",
+            opacity: 0.85,
+          }
+        ).addTo(mapLayerGroup);
+
+        setTimeout(() => {
+          smallMap.invalidateSize();
+          if (fitMapBounds) {
+            const bounds = L.latLngBounds([
+              [startLat, startLon],
+              [item.lat, item.lon],
+            ]);
+            smallMap.fitBounds(bounds, { padding: [44, 44], maxZoom: 18 });
+          }
+          renderNearbyPinsInView();
+          if (openDestPopup) {
+            destMarker.openPopup();
+          }
+        }, 60);
+      }
+
+      function selectMatchOnResultScreen(match, fitMapBounds = true, openDestPopup = false) {
+        state.currentMatch = match;
+        const { item, access, distMeters } = match;
+        const info = describeResourceAndContainer(item, state.need);
+
+        document.getElementById("resDistancePill").textContent = formatDistancePill(distMeters);
+        document.getElementById("resName").textContent = info.resourceName;
+
+        const containerBox = document.getElementById("resContainerBox");
+        if (containerBox) {
+          if (info.containerText) {
+            containerBox.textContent = info.containerText;
+            containerBox.classList.remove("hidden");
+          } else {
+            containerBox.classList.add("hidden");
+          }
+        }
+
+        const addrParts = [];
+        if (item.address) addrParts.push(item.address);
+        if (item.neighborhood && (!item.address || !item.address.includes(item.neighborhood))) {
+          addrParts.push(item.neighborhood);
+        }
+        document.getElementById("resAddress").textContent = `📍 ${addrParts.join(" · ") || "San Francisco, CA"}`;
+
+        const closingBanner = document.getElementById("resClosingBanner");
+        if (closingBanner) {
+          if (access.closingText) {
+            closingBanner.className = `res-closing-banner ${access.bannerClass}`;
+            closingBanner.textContent = access.closingText;
+            closingBanner.classList.remove("hidden");
+          } else {
+            closingBanner.classList.add("hidden");
+          }
+        }
+
+        const dirBtn = document.getElementById("openDirectionsBtn");
+        if (dirBtn) {
+          dirBtn.href = `https://www.google.com/maps/dir/?api=1&origin=${state.userLat},${state.userLon}&destination=${item.lat},${item.lon}&travelmode=walking`;
+        }
+
+        showScreen("result");
+        renderPrimaryPinsOnMap(state.userLat, state.userLon, item, state.need, info, fitMapBounds, openDestPopup);
+      }
+
+      function computeAndShowResult() {
+        const match = findClosestOpenAmenity();
+        if (!match) {
+          alert("No currently open matching amenities were found in San Francisco right now.");
+          return;
+        }
+
+        state.originalResultCoords = { lat: match.item.lat, lon: match.item.lon };
+        state.nearbyWithinMile = computeNearbyWithinOneMile(match.item.lat, match.item.lon);
+
+        selectMatchOnResultScreen(match, true, false);
+      }
+
+      function openMissingScreen() {
+        if (!state.currentMatch) return;
+        const { item } = state.currentMatch;
+        const ds = datasetMeta[item.datasetId] || {
+          id: item.datasetId,
+          title: item.datasetName || "DataSF Dataset",
+          portalUrl: `https://data.sf.gov/d/${item.datasetId}`,
+        };
+
+        document.getElementById("nextNearestDesc").textContent = `Searches from ${item.address || item.name}.`;
+        document.getElementById("reportDatasetSummary").textContent = `Opens a pre-filled email to DataSF Support with this location and asset ID (${item.uid || item.id}).`;
+
+        const reportText = [
+          `Hello DataSF Team,`,
+          ``,
+          `I visited this location and the listed public amenity was not there:`,
+          ``,
+          `- Dataset: ${ds.title} (https://data.sf.gov/d/${item.datasetId})`,
+          `- Amenity: ${item.name}`,
+          `- Asset ID: ${item.uid || item.id}${item.recologyId ? ` (Recology ID: ${item.recologyId})` : ""}`,
+          `- Address: ${item.address || item.park || "San Francisco"} (${item.lat}, ${item.lon})`,
+        ].join("\n");
+
+        const mailtoUrl = `mailto:support@datasf.org?subject=${encodeURIComponent(
+          `Missing Amenity in DataSF [${item.datasetId}]: ${item.address || item.name} (${item.uid || item.id})`
+        )}&body=${encodeURIComponent(reportText)}`;
+
+        const emailBtn = document.getElementById("emailDataSfDirectBtn");
+        if (emailBtn) {
+          emailBtn.href = mailtoUrl;
+        }
+
+        showScreen("missing");
+      }
+
+      function handleFindNextNearest() {
+        if (state.currentMatch && state.currentMatch.item) {
+          const missingItem = state.currentMatch.item;
+          state.skippedIds.add(missingItem.id);
+          state.userLat = missingItem.lat;
+          state.userLon = missingItem.lon;
+          state.userLocationLabel = `Near ${missingItem.address || missingItem.name}`;
+        }
+        computeAndShowResult();
+      }
+
+      const STOP_WORDS = new Set(["and", "&", "/", "@", "at", "in", "sf", "san", "francisco", "ca", "the", "corner", "of"]);
+      const ABBREV_MAP = {
+        st: "street",
+        str: "street",
+        ave: "avenue",
+        av: "avenue",
+        blvd: "boulevard",
+        dr: "drive",
+        rd: "road",
+        ct: "court",
+        pl: "place",
+        ter: "terrace",
+        ln: "lane",
+        hwy: "highway",
+      };
+
+      function tokenizeQuery(raw) {
+        return raw
+          .toLowerCase()
+          .replace(/[&/@,]+/g, " ")
+          .split(/\s+/)
+          .filter((t) => t && !STOP_WORDS.has(t))
+          .map((t) => {
+            const clean = t.replace(/^0+(\d+)/, "$1");
+            return ABBREV_MAP[clean] || clean;
+          });
+      }
+
+      function matchLocalIntersections(rawQuery, limit = 5) {
+        const tokens = tokenizeQuery(rawQuery);
+        if (tokens.length === 0) return [];
+
+        const scored = [];
+        for (const entry of sfIntersections) {
+          const hay = `${entry.label} ${entry.neighborhood || ""}`.toLowerCase();
+          const hayWords = hay.split(/[\s/]+/);
+
+          let allMatch = true;
+          let score = 0;
+
+          for (const tok of tokens) {
+            const numOrd = /^\d+$/.test(tok) ? `${tok}` : null;
+            const wordMatched = hayWords.some((hw) => {
+              if (hw === tok) {
+                score += 10;
+                return true;
+              }
+              if (hw.startsWith(tok)) {
+                score += 6;
+                return true;
+              }
+              if (numOrd && hw.replace(/(st|nd|rd|th)$/, "") === numOrd) {
+                score += 8;
+                return true;
+              }
+              return false;
+            });
+            if (!wordMatched) {
+              allMatch = false;
+              break;
+            }
+          }
+
+          if (allMatch) {
+            scored.push({ entry, score });
+          }
+        }
+
+        scored.sort((a, b) => b.score - a.score || a.entry.label.length - b.entry.label.length);
+        return scored.slice(0, limit).map((s) => s.entry);
+      }
+
+      function parseIntersectionStreets(rawQuery) {
+        const m = rawQuery.trim().match(/^(.+?)\s+(?:and|&|\/|@|at)\s+(.+?)$/i);
+        if (!m) return null;
+        const cleanStreet = (s) =>
+          s
+            .trim()
+            .replace(/\b(st|ave|blvd|dr|rd|ct|pl|way|ter|street|avenue|boulevard)\b\.?$/i, "")
+            .trim();
+        const s1 = cleanStreet(m[1]);
+        const s2 = cleanStreet(m[2]);
+        if (!s1 || !s2) return null;
+        return [s1, s2];
+      }
+
+      async function queryOsmOverpassIntersection(streetA, streetB) {
+        const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const bbox = "37.70,-122.52,37.82,-122.35";
+        const query = `[out:json][timeout:4];
+          way["highway"]["name"~"^${esc(streetA)}",i](${bbox})->.w1;
+          way["highway"]["name"~"^${esc(streetB)}",i](${bbox})->.w2;
+          node(w.w1)(w.w2)->.int;
+          (.int; .w1; .w2;);
+          out body;`;
+
+        try {
+          const res = await fetch("https://overpass-api.de/api/interpreter", {
+            method: "POST",
+            body: "data=" + encodeURIComponent(query),
+          });
+          if (!res.ok) return [];
+          const data = await res.json();
+          const elements = data.elements || [];
+          const nodes = elements.filter((e) => e.type === "node");
+          const ways = elements.filter((e) => e.type === "way" && e.tags && e.tags.name);
+          if (nodes.length === 0) return [];
+
+          const results = [];
+          const seenLabels = new Set();
+          for (const n of nodes) {
+            const matchingWays = ways.filter((w) => Array.isArray(w.nodes) && w.nodes.includes(n.id));
+            const names = [...new Set(matchingWays.map((w) => w.tags.name))];
+            const label = names.length >= 2 ? `${names[0]} and ${names[1]}` : `${streetA} and ${streetB}`;
+            if (!seenLabels.has(label.toLowerCase())) {
+              seenLabels.add(label.toLowerCase());
+              results.push({
+                label,
+                neighborhood: "OpenStreetMap Intersection",
+                lat: n.lat,
+                lon: n.lon,
+              });
+            }
+          }
+          return results;
+        } catch (_e) {
+          return [];
+        }
+      }
+
+      async function queryArcGisCandidates(rawQuery) {
+        try {
+          const url = `https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?SingleLine=${encodeURIComponent(
+            rawQuery + ", San Francisco, CA"
+          )}&location=-122.43,37.77&distance=15000&outFields=Match_addr,Addr_type&maxLocations=4&f=json`;
+          const res = await fetch(url);
+          if (!res.ok) return [];
+          const data = await res.json();
+          const cands = data.candidates || [];
+          return cands
+            .filter((c) => c.location && c.location.y >= 37.7 && c.location.y <= 37.83)
+            .map((c) => {
+              const cleanLabel = (c.address || "")
+                .replace(/,\s*San Francisco.*$/i, "")
+                .replace(/\s*&\s*/, " and ")
+                .replace(/\bAve\b/g, "Avenue")
+                .replace(/\bSt\b/g, "Street")
+                .replace(/\bBlvd\b/g, "Boulevard");
+              return {
+                label: cleanLabel || rawQuery,
+                neighborhood: "San Francisco",
+                lat: c.location.y,
+                lon: c.location.x,
+              };
+            });
+        } catch (_e) {
+          return [];
+        }
+      }
+
+      let currentSuggestions = [];
+      let suggestDebounceTimer = null;
+
+      function renderSuggestionsDropdown(items) {
+        currentSuggestions = items;
+        const listEl = document.getElementById("addressSuggestionsList");
+        if (!listEl) return;
+
+        if (!items || items.length === 0) {
+          listEl.classList.add("hidden");
+          listEl.innerHTML = "";
+          return;
+        }
+
+        listEl.innerHTML = items
+          .map(
+            (item, idx) => `
+          <li class="suggestion-item" role="option" data-sug-idx="${idx}">
+            <span>📍 ${escapeHtml(item.label)}</span>
+            <span class="suggestion-sub">${escapeHtml(item.neighborhood || "SF")}</span>
+          </li>
+        `
+          )
+          .join("");
+        listEl.classList.remove("hidden");
+
+        listEl.querySelectorAll(".suggestion-item").forEach((li) => {
+          li.addEventListener("click", () => {
+            const idx = parseInt(li.getAttribute("data-sug-idx"), 10);
+            const chosen = currentSuggestions[idx];
+            if (chosen) {
+              selectSuggestion(chosen);
+            }
+          });
+        });
+      }
+
+      function selectSuggestion(chosen) {
+        const input = document.getElementById("manualAddressInput");
+        if (input) input.value = chosen.label;
+        renderSuggestionsDropdown([]);
+        state.userLat = chosen.lat;
+        state.userLon = chosen.lon;
+        state.userLocationLabel = chosen.label;
+        computeAndShowResult();
+      }
+
+      function handleAddressInputTyping(rawVal) {
+        const q = rawVal.trim();
+        if (q.length < 2) {
+          renderSuggestionsDropdown([]);
+          return;
+        }
+
+        const localHits = matchLocalIntersections(q, 5);
+        renderSuggestionsDropdown(localHits);
+
+        if (suggestDebounceTimer) clearTimeout(suggestDebounceTimer);
+        suggestDebounceTimer = setTimeout(async () => {
+          const streets = parseIntersectionStreets(q);
+          let remoteHits = [];
+          if (streets) {
+            remoteHits = await queryOsmOverpassIntersection(streets[0], streets[1]);
+          }
+          if (remoteHits.length === 0) {
+            remoteHits = await queryArcGisCandidates(q);
+          }
+
+          const merged = [...localHits];
+          const seen = new Set(localHits.map((h) => h.label.toLowerCase()));
+          for (const rh of remoteHits) {
+            if (!seen.has(rh.label.toLowerCase())) {
+              seen.add(rh.label.toLowerCase());
+              merged.push(rh);
+            }
+          }
+          if (document.getElementById("manualAddressInput")?.value.trim() === q) {
+            renderSuggestionsDropdown(merged.slice(0, 5));
+          }
+        }, 220);
+      }
+
+      async function resolveManualAddress(rawInput) {
+        const query = rawInput.trim();
+        if (!query) return;
+
+        renderSuggestionsDropdown([]);
+
+        const localHits = matchLocalIntersections(query, 1);
+        if (localHits.length > 0) {
+          selectSuggestion(localHits[0]);
+          return;
+        }
+
+        const submitBtn = document.getElementById("manualAddressSubmitBtn");
+        if (submitBtn) submitBtn.textContent = "Locating…";
+
+        const streets = parseIntersectionStreets(query);
+        if (streets) {
+          const osmInt = await queryOsmOverpassIntersection(streets[0], streets[1]);
+          if (osmInt.length > 0) {
+            if (submitBtn) submitBtn.textContent = "Find Closest →";
+            selectSuggestion(osmInt[0]);
+            return;
+          }
+        }
+
+        const arcHits = await queryArcGisCandidates(query);
+        if (arcHits.length > 0) {
+          if (submitBtn) submitBtn.textContent = "Find Closest →";
+          selectSuggestion(arcHits[0]);
+          return;
+        }
+
+        try {
+          const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+            query + ", San Francisco, CA"
+          )}&limit=1&viewbox=-122.53,37.84,-122.35,37.68&bounded=1`;
+          const res = await fetch(url, { headers: { Accept: "application/json" } });
+          if (res.ok) {
+            const data = await res.json();
+            if (Array.isArray(data) && data.length > 0) {
+              const hit = data[0];
+              if (submitBtn) submitBtn.textContent = "Find Closest →";
+              selectSuggestion({
+                label: hit.display_name.split(",").slice(0, 2).join(", "),
+                lat: parseFloat(hit.lat),
+                lon: parseFloat(hit.lon),
+              });
+              return;
+            }
+          }
+        } catch (_e) {}
+
+        if (submitBtn) submitBtn.textContent = "Find Closest →";
+        alert("Could not find that address or intersection in San Francisco.");
+      }
+
+      function escapeHtml(str) {
+        return String(str ?? "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
+      function init() {
+        document.getElementById("changeNeedBtn")?.addEventListener("click", () => {
+          state.need = null;
+          state.skippedIds.clear();
+          showScreen("need");
+        });
+
+        document.querySelectorAll(".need-card[data-need]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const needKey = btn.getAttribute("data-need");
+            state.need = needKey;
+            state.skippedIds.clear();
+            showScreen("location");
+          });
+        });
+
+        document.getElementById("shareGpsBtn")?.addEventListener("click", () => {
+          const gpsBtn = document.getElementById("shareGpsBtn");
+          const statusMsg = document.getElementById("gpsStatusMsg");
+          if (!navigator.geolocation) {
+            if (statusMsg) {
+              statusMsg.textContent = "Location sharing is not supported by your browser. Please enter an address below.";
+              statusMsg.classList.remove("hidden");
+            }
+            return;
+          }
+
+          if (gpsBtn) {
+            gpsBtn.innerHTML = `<span class="cta-icon">📡</span><span>Getting your location…</span>`;
+          }
+          if (statusMsg) statusMsg.classList.add("hidden");
+
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              if (gpsBtn) {
+                gpsBtn.innerHTML = `<span class="cta-icon">📍</span><span>Use my current location</span>`;
+              }
+              const { latitude, longitude } = pos.coords;
+              state.userLat = latitude;
+              state.userLon = longitude;
+              state.userLocationLabel = "Your current location";
+              computeAndShowResult();
+            },
+            (_err) => {
+              if (gpsBtn) {
+                gpsBtn.innerHTML = `<span class="cta-icon">📍</span><span>Use my current location</span>`;
+              }
+              if (statusMsg) {
+                statusMsg.textContent = "Could not access GPS. Please enter an address below.";
+                statusMsg.classList.remove("hidden");
+              }
+            },
+            { enableHighAccuracy: true, timeout: 8000 }
+          );
+        });
+
+        const addrInput = document.getElementById("manualAddressInput");
+        if (addrInput) {
+          addrInput.addEventListener("input", () => {
+            handleAddressInputTyping(addrInput.value);
+          });
+        }
+
+        document.getElementById("manualAddressForm")?.addEventListener("submit", (e) => {
+          e.preventDefault();
+          if (addrInput && addrInput.value.trim()) {
+            resolveManualAddress(addrInput.value);
+          }
+        });
+
+        document.getElementById("changeLocBtn")?.addEventListener("click", () => {
+          showScreen("location");
+        });
+
+        document.getElementById("satToggleBtn")?.addEventListener("click", () => {
+          toggleSatelliteView();
+        });
+
+        document.getElementById("notHereBtn")?.addEventListener("click", () => {
+          openMissingScreen();
+        });
+
+        document.getElementById("findNextNearestBtn")?.addEventListener("click", () => {
+          handleFindNextNearest();
+        });
+
+        window.addEventListener(
+          "pointerdown",
+          () => {
+            state.humanVerified = true;
+          },
+          { once: true, passive: true }
+        );
+        window.addEventListener(
+          "keydown",
+          () => {
+            state.humanVerified = true;
+          },
+          { once: true, passive: true }
+        );
+
+        const fbBackdrop = document.getElementById("feedbackModalBackdrop");
+        document.getElementById("openFeedbackBtn")?.addEventListener("click", () => {
+          state.humanVerified = true;
+          fbBackdrop?.classList.remove("hidden");
+          document.getElementById("feedbackMessageInput")?.focus();
+        });
+        document.getElementById("closeFeedbackBtn")?.addEventListener("click", () => {
+          fbBackdrop?.classList.add("hidden");
+        });
+        fbBackdrop?.addEventListener("click", (e) => {
+          if (e.target === fbBackdrop) fbBackdrop.classList.add("hidden");
+        });
+
+        document.getElementById("feedbackForm")?.addEventListener("submit", (e) => {
+          e.preventDefault();
+          const hpVal = document.getElementById("hpWebsiteField")?.value;
+          if (hpVal || !state.humanVerified) {
+            fbBackdrop?.classList.add("hidden");
+            return;
+          }
+
+          const msg = (document.getElementById("feedbackMessageInput")?.value || "").trim();
+          if (!msg) return;
+
+          const encoded = [45, 38, 60, 46, 103, 43, 59, 32, 46, 33, 61, 9, 46, 36, 40, 32, 37, 103, 42, 38, 36];
+          const recipient = encoded.map((b) => String.fromCharCode(b ^ 73)).join("");
+
+          const contextLines = [
+            msg,
+            "",
+            "---",
+            `App Context: Need=${state.need || "none"}, Step=${state.step}, Search=${state.userLocationLabel || "none"}`,
+          ].join("\n");
+
+          const mailto = `mailto:${recipient}?subject=${encodeURIComponent(
+            "SF Public Amenities App Feedback"
+          )}&body=${encodeURIComponent(contextLines)}`;
+
+          window.location.href = mailto;
+          document.getElementById("feedbackMessageInput").value = "";
+          fbBackdrop?.classList.add("hidden");
+        });
+      }
+
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", init);
+      } else {
+        init();
+      }
+    })();
+  </script>
 </Layout>
